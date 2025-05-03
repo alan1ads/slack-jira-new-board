@@ -1,4 +1,4 @@
-const { App } = require('@slack/bolt');
+const { App, ExpressReceiver } = require('@slack/bolt');
 const express = require('express');
 const { 
   loadTrackingDataFromJira, 
@@ -28,23 +28,28 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-// Initialize the Slack app
+// Create a single receiver for both Slack and health checks
+const port = process.env.PORT || 3000;
+const receiver = new ExpressReceiver({
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
+  processBeforeResponse: true
+});
+
+// Add health check routes to the same Express instance
+receiver.router.get('/', (req, res) => {
+  res.send('Jira Campaign Alerts service is running');
+});
+receiver.router.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
+// Initialize the Slack app with the receiver
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
   // Disable socket mode on Render
   socketMode: !process.env.RENDER,
   appToken: !process.env.RENDER ? process.env.SLACK_APP_TOKEN : undefined,
-  port: process.env.PORT || 3000
-});
-
-// Initialize Express for health checks (used by Render)
-const expressApp = express();
-expressApp.get('/', (req, res) => {
-  res.send('Jira Campaign Alerts service is running');
-});
-expressApp.get('/health', (req, res) => {
-  res.status(200).send('OK');
+  receiver: process.env.RENDER ? receiver : undefined
 });
 
 // Create a slash command to check issue duration
@@ -143,26 +148,25 @@ app.command('/reload-tracking', async ({ ack, say }) => {
 
 // Start the Slack app and schedule periodic tasks
 (async () => {
-  // Start the server
-  await app.start();
-  console.log('⚡️ Jira Campaign Alerts app is running!');
-  
-  // Start Express server for health checks
-  const port = process.env.PORT || 3000;
-  expressApp.listen(port, () => {
-    console.log(`Health check endpoint listening on port ${port}`);
-  });
-  
-  // Initial load of tracking data from Jira
-  await loadTrackingDataFromJira(app);
-  
-  // Set up periodic checks for status alerts (every 5 minutes)
-  setInterval(async () => {
-    await checkCampaignAlerts(app);
-  }, 5 * 60 * 1000);
-  
-  // Set up periodic reload of tracking data from Jira (every 60 minutes)
-  setInterval(async () => {
+  try {
+    // Start the server
+    await app.start(port);
+    console.log(`⚡️ Jira Campaign Alerts app is running on port ${port}!`);
+    
+    // Initial load of tracking data from Jira
     await loadTrackingDataFromJira(app);
-  }, 60 * 60 * 1000);
+    
+    // Set up periodic checks for status alerts (every 5 minutes)
+    setInterval(async () => {
+      await checkCampaignAlerts(app);
+    }, 5 * 60 * 1000);
+    
+    // Set up periodic reload of tracking data from Jira (every 60 minutes)
+    setInterval(async () => {
+      await loadTrackingDataFromJira(app);
+    }, 60 * 60 * 1000);
+  } catch (error) {
+    console.error('Error starting app:', error);
+    process.exit(1);
+  }
 })(); 
