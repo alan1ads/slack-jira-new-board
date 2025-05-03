@@ -32,8 +32,9 @@ if (missingEnvVars.length > 0) {
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   signingSecret: process.env.SLACK_SIGNING_SECRET,
-  socketMode: process.env.SLACK_APP_TOKEN ? true : false,
-  appToken: process.env.SLACK_APP_TOKEN,
+  // Disable socket mode on Render
+  socketMode: !process.env.RENDER,
+  appToken: !process.env.RENDER ? process.env.SLACK_APP_TOKEN : undefined,
   port: process.env.PORT || 3000
 });
 
