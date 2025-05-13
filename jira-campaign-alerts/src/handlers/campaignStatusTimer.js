@@ -472,7 +472,8 @@ const CAMPAIGN_STATUS_THRESHOLDS = {
   "4: Campaign creation": 1440,             // 24 hours
   "5: Submission Review": 1440,             // 24 hours
   "6: Live - FASE1-5": 12960,               // 9 days (216 hours)
-  "7: mediabuyer handout": null             // Timer disabled
+  "7: mediabuyer handout": null,            // Timer disabled
+  "0: Failed": null                         // Timer disabled
 };
 
 // Check if issue has an assignee
