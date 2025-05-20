@@ -173,7 +173,19 @@ const loadTrackingDataFromJira = async (app) => {
     console.log(`🔍 Found ${response.data.issues.length} active issues to track`);
     
     // Get all issues to process
-    const activeIssues = response.data.issues;
+    const activeIssues = response.data.issues.filter(issue => {
+      // Skip issues with null threshold statuses
+      const status = issue.fields.status.name.toUpperCase();
+      return !(
+        status.includes("0: FAILED") ||
+        status.includes("1: LANDER URL DELIVERY") ||
+        status.includes("2: CREATIVE DELIVERY") ||
+        status.includes("3: ANGLE") ||
+        status.includes("7: MEDIABUYER HANDOUT")
+      );
+    });
+
+    console.log(`🔍 Filtered down to ${activeIssues.length} issues (excluding statuses with null thresholds)`);
     
     // Track issues we've processed to detect any that need to be removed
     const processedIssues = new Set();
@@ -488,6 +500,7 @@ const getThresholdMs = (statusType, statusValue, issue) => {
   
   // Return null for statuses with disabled timers
   if (
+    campaignStatus.includes("0: FAILED") ||
     campaignStatus.includes("1: LANDER URL DELIVERY") || 
     campaignStatus.includes("2: CREATIVE DELIVERY") || 
     campaignStatus.includes("3: ANGLE") || 
